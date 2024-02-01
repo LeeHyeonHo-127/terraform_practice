@@ -97,11 +97,14 @@ resource "aws_launch_configuration" "example" {
   instance_type = "t3.micro"
   security_groups = [aws_security_group.instance.id]
   
-  user_data  =  <<-EOF
-              #!/bin/bash
-              echo  "Hello, World"  >  index.html
-              nohup busybox httpd -f -p ${var.server_port} &
-              EOF
+  # Render the User Data Script as a template  
+  user_data  =  templatefile("user-data.sh", {
+  server_port = var.server_port
+  db_address = data.terraform_remote_state.db.outputs.address
+  db_port = data.terraform_remote_state.db.outputs.port
+  })
+
+  # Required when using a launch configuration with an auto scaling group.
   lifecycle {
       create_before_destroy = true
   }
@@ -140,32 +143,4 @@ resource "aws_security_group" "instance" {
 }
 
 
-# Variable
-
-variable "server_port" {
-  description = "The Port. the server will use for HTTP requests"
-  type = number
-  default = 8080
-}
-
-# Data
-
-data "aws_vpc" "default" {
-  default = true
-}
-
-
-data "aws_subnets" "default" {
-  filter {
-    name = "vpc-id"
-    values = [data.aws_vpc.default.id]
-   }
-}
-
-# Output
-
-output "alb_dns_name" {
-   value = aws_lb.example.dns_name
-   description = "The domain name of the load balancer"
-}
 
